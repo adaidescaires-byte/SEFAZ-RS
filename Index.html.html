@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SefazApp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+            background-color: #f3f4f6; 
+            overscroll-behavior-y: contain; /* Evita pull-to-refresh nativo */
+            -webkit-tap-highlight-color: transparent; /* Remove piscar azul no toque */
+        }
+        .progress-transition { transition: stroke-dasharray 0.5s ease, width 0.5s ease; }
+        ::-webkit-scrollbar { display: none; } /* Esconde barra de rolagem (Estilo App) */
+        
+        /* Layout fixo do App */
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+        }
+        #main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 70px;
+        }
+        
+        /* Barra de Navegação Inferior (Android Style) */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: white;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-around;
+            padding-bottom: env(safe-area-inset-bottom); 
+            z-index: 100;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px 0;
+            flex: 1;
+            color: #9ca3af;
+            font-size: 0.70rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-item.active { color: #1e40af; }
+        .nav-item i { font-size: 1.25rem; margin-bottom: 4px; }
+        .touch-target { min-height: 48px; } /* Padrão de acessibilidade mobile */
+    </style>
+</head>
+<body class="text-gray-800 select-none">
+
+    <div id="app-container">
+        <!-- App Bar Superior -->
+        <header class="bg-blue-800 text-white shadow-md z-50 pt-safe">
+            <div class="px-5 py-4 flex justify-between items-center touch-target">
+                <h1 class="text-xl font-bold tracking-wide">SEFAZ Tracker</h1>
+                <button onclick="resetData()" class="text-blue-100 bg-blue-900 rounded-full w-10 h-10 flex items-center justify-center active:bg-blue-700 transition">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Área Central de Conteúdo -->
+        <main id="main-content">
+            
+            <!-- VIEW: DASHBOARD -->
+            <section id="view-dashboard" class="block p-4">
+                <div class="bg-white rounded-2xl shadow-sm p-5 mb-6 border border-gray-100">
+                    <h2 class="text-base font-bold mb-3 text-gray-800">Progresso Geral</h2>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-500">Edital Concluído</span>
+                        <span id="total-percent" class="font-bold text-blue-700 text-lg">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 mb-1">
+                        <div id="total-bar" class="bg-blue-600 h-3 rounded-full progress-transition" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 ml-2">Desempenho por Blocos</h3>
+                <div class="flex flex-col gap-3" id="dashboard-blocks">
+                    <!-- Progressos injetados via JS -->
+                </div>
+            </section>
+
+            <!-- VIEW: EDITAL (Matérias) -->
+            <section id="view-edital" class="hidden p-4 space-y-4">
+                <!-- Acordeões injetados via JS -->
+            </section>
+
+        </main>
+
+        <!-- Bottom Navigation Android -->
+        <nav class="bottom-nav">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-item active">
+                <i class="fas fa-chart-pie"></i>
+                <span>Painel</span>
+            </button>
+            <button onclick="switchTab('edital')" id="tab-edital" class="nav-item">
+                <i class="fas fa-list-ul"></i>
+                <span>Matérias</span>
+            </button>
+        </nav>
+    </div>
+
+    <script>
+        // --- DATA STRUCTURE (Extracted from Edital) ---
+        const defaultEditalData = [
+            {
+                id: "bloco1",
+                title: "BLOCO I",
+                subjects: [
+                    {
+                        name: "Língua Portuguesa",
+                        topics: [
+                            "1 Leitura e análise de textos", "2 Estruturação do texto e parágrafos", "3 Articulação do texto", "4 Significação contextual",
+                            "5 Interpretação: pressuposições e inferências", "6 Variedades de texto", "7 Equivalência e transformação de estruturas",
+                            "8 Discurso direto e indireto", "9 Sintaxe", "10 Tempos e modos verbais", "11 Pontuação", "12 Estrutura e formação de palavras",
+                            "13 Funções das classes de palavras", "14 Flexão nominal e verbal", "15 Pronomes", "16 Concordância nominal e verbal",
+                            "17 Regência nominal e verbal", "18 Crase", "19 Ortografia oficial", "20 Acentuação gráfica", "21 Figuras de linguagem"
+                        ]
+                    },
+                    {
+                        name: "Direito Empresarial, Civil e Penal",
+                        topics: [
+                            "[EMP] 1 Empresário a 4 Lei 6.404/76", "[EMP] 5 Estabelecimento a 8 Órgãos sociais", "[EMP] 9 Desconsideração da personalidade jurídica a 11 Sociedades",
+                            "[EMP] 12 Contratos e obrigações mercantis", "[EMP] 13 Títulos de crédito", "[EMP] 14 Falência e recuperação judicial", "[EMP] 15 Comércio eletrônico",
+                            "[CIV] 1 A Lei a 4 Fatos jurídicos", "[CIV] 5 Negócios jurídicos a 10 Prescrição e decadência", "[CIV] 11 Direitos reais e obrigacionais a 14 Direitos reais sobre coisa alheia",
+                            "[CIV] 15 Obrigações", "[CIV] 16 Contratos a 18 Cooperativas", "[CIV] 19 Casamento a 23 Inventário e partilha", "[CIV] 24 Temáticas de Gênero, Raça e Etnia (Leis 11.340, 12.288, 13.694)",
+                            "[PEN] 1 Aplicação da lei penal a 3 Dolo e culpa", "[PEN] 4 Crimes contra a fé pública", "[PEN] 5 Crimes contra a administração pública", "[PEN] 6 Lei 8.429/92 (Improbidade)", "[PEN] 7 a 9 Crimes ordem tributária, finanças e Infração"
+                        ]
+                    },
+                    {
+                        name: "Tecnologia da Informação",
+                        topics: [
+                            "1 Gerência de Projetos (PMBOK)", "2 Gestão de Processos de Negócio (BPM)", "3 Gerência de Serviços de TI (ITIL v3, COBIT v5)",
+                            "4 Banco de dados (Relacional, Multidimensional, DW, OLAP, Data Mining, ETL, BI)", "5 Segurança da informação (Continuidade, Criptografia, Certificação, Auditoria)"
+                        ]
+                    },
+                    {
+                        name: "Matemática e Raciocínio Lógico",
+                        topics: [
+                            "[MAT] 1 Álgebra (Conjuntos, Regra de três, Equações, Matrizes, etc)", "[MAT] 2 Trigonometria e 3 Geometria plana",
+                            "[MAT] 4 Juros simples e 5 Juros compostos", "[MAT] 6 Descontos", "[MAT] 7 Rendas certas e Amortização (SAC e Francês)", "[MAT] 8 Fluxo de caixa (TIR, Payback, VPL)",
+                            "[RL] 1 Estrutura lógica de relações arbitrárias", "[RL] 2 Raciocínio verbal, matemático, sequencial, espacial", "[RL] 3 Processo lógico a partir de hipóteses"
+                        ]
+                    }
+                ]
+            },
+            {
+                id: "bloco2",
+                title: "BLOCO II",
+                subjects: [
+                    {
+                        name: "Contabilidade (Geral, Análise, Avançada e Custos)",
+                        topics: [
+                            "[GERAL] 1 a 5 Contabilidade, Princípios, Atos/Fatos, Livros", "[GERAL] 6 a 10 Variação PL, Resultados, Regimes, Escrituração, Fatos",
+                            "[GERAL] 11 a 14 Itens Patrimoniais, Demonstrações contábeis e Notas", "[GERAL] 15 Estoques e 16 Apuração CMV e tributos",
+                            "[ANÁLISE] 1 a 7 Objetivos, Análise Vert/Horiz, Índices Liquidez e Endividamento", "[ANÁLISE] 8 a 16 Indicadores de Desempenho, Retorno, Capital de Giro e Rentabilidade",
+                            "[AVANÇADA] 1 a 3 Critérios de avaliação, Contabilização de vendas, Consolidação", "[AVANÇADA] 4 a 7 Reorganização, Valor recuperável, Intangível e Ajuste a valor presente",
+                            "[CUSTOS] 1 a 7 Conceitos, Apropriação, Departamentalização, Produção", "[CUSTOS] 8 a 13 Tipos de produção e custeio, Custos estimados e padrão", "[CUSTOS] 14 a 18 Margem de contribuição e Ponto de equilíbrio"
+                        ]
+                    },
+                    {
+                        name: "Direito Administrativo e Constitucional",
+                        topics: [
+                            "[ADM] 1 a 3 Conceitos, Estado/Governo, Organização administrativa", "[ADM] 4 Agentes Públicos", "[ADM] 5 Poderes e 6 Ato administrativo",
+                            "[ADM] 7 Contrato administrativo e 8 Convênio", "[ADM] 9 Licitação e 10 Regime Diferenciado (Lei 12.462)", "[ADM] 11 Serviços e 12 Domínio público",
+                            "[ADM] 13 Intervenção na propriedade e 14 Lei Orgânica (LC 13.452/2010)",
+                            "[CONST] 1 a 6 Teoria do Estado e da Constituição", "[CONST] 7 a 10 Poder constituinte, Emenda, Princípios", "[CONST] 11 e 12 Controle de Constitucionalidade",
+                            "[CONST] 13 a 16 Aplicabilidade, Direitos e garantias", "[CONST] 17 Ações constitucionais", "[CONST] 18 a 22 Organização do Estado, Administração, Poderes, Funções essenciais", "[CONST] 23 Constituição do RS"
+                        ]
+                    },
+                    {
+                        name: "Direito Tributário",
+                        topics: [
+                            "1 Tributo: conceito e classificação", "2 Normas gerais e legislação tributária", "3 Obrigação tributária principal e acessória",
+                            "4 Responsabilidade tributária", "5 Crédito tributário (constituição, suspensão, extinção, exclusão)", "6 Administração tributária (Dívida ativa, certidões)",
+                            "7 Sistema Tributário Nacional (Repartição de receitas, Limitações)", "8 ICMS (Lei Complementar 87/1996)", "9 Execução fiscal (CPC)", "10 Convênios ICMS (LC 24/1975)"
+                        ]
+                    }
+                ]
+            },
+            {
+                id: "bloco3",
+                title: "BLOCO III",
+                subjects: [
+                    {
+                        name: "Legislação Tributária Estadual do RS",
+                        topics: [
+                            "1 Sistema Tributário do Estado (Constituição RS)", "2 ICMS (Lei 8.820/1989 e Decreto 37.699/1997) - Principal e Acessória",
+                            "3 IPVA (Lei 8.115/1985 e Decreto 32.144/1985)", "4 ITCD (Lei 8.821/1989 e Decreto 33.156/1989)",
+                            "5 Taxas (Lei 8.109/1985 e Lei 14.634/2014)", "6 Procedimento Tributário Administrativo (Lei 6.537/1973 e TARF)"
+                        ]
+                    },
+                    {
+                        name: "Auditoria Contábil e Auditoria Fiscal",
+                        topics: [
+                            "[CONTÁBIL] 1 a 6 Conceitos, Testes, Papéis de trabalho", "[CONTÁBIL] 7 a 13 Normas, Planejamento, Fraude/Erro, Riscos, Controle interno",
+                            "[CONTÁBIL] 14 a 21 Amostragem, Estimativas, Transações, Contingências", "[CONTÁBIL] 22 a 28 Carta de responsabilidade e Pareceres",
+                            "[CONTÁBIL] 29 Princípios de contabilidade (NBC TSP e Resolução 1.374/2011)", "[FISCAL] 1 Questões práticas sobre Legislação Tributária do RS"
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        let appData = [];
+
+        // Transforma a página em um App Instalável (PWA)
+        function initPWA() {
+            const manifest = {
+                "name": "SEFAZ Tracker",
+                "short_name": "SEFAZ",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#f3f4f6",
+                "theme_color": "#1e40af",
+                "icons": [{
+                    "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Android_robot.svg/512px-Android_robot.svg.png",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }]
+            };
+            const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+            document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+        }
+
+        function initApp() {
+            initPWA();
+            loadData();
+            renderApp();
+            switchTab('dashboard'); // Inicia no Dashboard
+        }
+
+        // Alternar entre as abas nativas inferiores
+        function switchTab(tabId) {
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-edital').classList.add('hidden');
+            document.getElementById('tab-dashboard').classList.remove('active');
+            document.getElementById('tab-edital').classList.remove('active');
+
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            // Rola para o topo ao trocar de aba
+            document.getElementById('main-content').scrollTop = 0;
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem('sefazAppTrackerData');
+            if (savedData) {
+                appData = JSON.parse(savedData);
+            } else {
+                appData = JSON.parse(JSON.stringify(defaultEditalData)); 
+                appData.forEach(block => {
+                    block.subjects.forEach(subject => {
+                        let newTopics = [];
+                        subject.topics.forEach(topicName => {
+                            newTopics.push({ name: topicName, theory: false, review: false, questions: false });
+                        });
+                        subject.topics = newTopics;
+                    });
+                });
+                saveData();
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('sefazAppTrackerData', JSON.stringify(appData));
+        }
+
+        function resetData() {
+            if(confirm("Deseja apagar todo o progresso do App?")) {
+                localStorage.removeItem('sefazAppTrackerData');
+                initApp();
+            }
+        }
+
+        function toggleState(blockIdx, subjectIdx, topicIdx, field) {
+            appData[blockIdx].subjects[subjectIdx].topics[topicIdx][field] = !appData[blockIdx].subjects[subjectIdx].topics[topicIdx][field];
+            saveData();
+            updateDashboard();
+            
+            // Adiciona feedback visual vibratório se o celular suportar
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+
+        function toggleAccordion(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById(`icon-${id}`);
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.style.transform = "rotate(180deg)";
+            } else {
+                content.classList.add('hidden');
+                icon.style.transform = "rotate(0deg)";
+            }
+            icon.style.transition = "transform 0.3s ease";
+        }
+
+        function renderApp() {
+            const container = document.getElementById('view-edital');
+            container.innerHTML = '';
+
+            appData.forEach((block, bIdx) => {
+                const blockSection = document.createElement('div');
+                blockSection.className = 'bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100';
+                
+                let blockHtml = `
+                    <div class="bg-gray-50 px-5 py-4 touch-target flex justify-between items-center active:bg-gray-100 transition" onclick="toggleAccordion('block-${bIdx}')">
+                        <h2 class="text-base font-bold text-gray-800">${block.title}</h2>
+                        <i id="icon-block-${bIdx}" class="fas fa-chevron-down text-gray-400 text-sm"></i>
+                    </div>
+                    <div id="block-${bIdx}" class="hidden p-3 space-y-3">
+                `;
+
+                block.subjects.forEach((subject, sIdx) => {
+                    blockHtml += `
+                        <div class="border border-gray-200 rounded-xl overflow-hidden">
+                            <div class="bg-white px-4 py-3 touch-target flex justify-between items-center active:bg-blue-50 transition" onclick="toggleAccordion('subject-${bIdx}-${sIdx}')">
+                                <h3 class="font-semibold text-blue-900 text-sm w-3/4 leading-tight">${subject.name}</h3>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded-full" id="stats-${bIdx}-${sIdx}"></span>
+                                    <i id="icon-subject-${bIdx}-${sIdx}" class="fas fa-chevron-down text-blue-300 text-xs"></i>
+                                </div>
+                            </div>
+                            <div id="subject-${bIdx}-${sIdx}" class="hidden bg-gray-50">
+                                <ul class="divide-y divide-gray-200">
+                    `;
+
+                    subject.topics.forEach((topic, tIdx) => {
+                        // Design focado em touch (botões grandes em grid)
+                        blockHtml += `
+                            <li class="px-4 py-4 flex flex-col gap-3">
+                                <span class="text-sm text-gray-700 leading-tight">${topic.name}</span>
+                                <div class="flex justify-between items-center bg-white p-2 rounded-xl border border-gray-100 shadow-sm gap-2">
+                                    
+                                    <label class="flex flex-col items-center gap-1 flex-1 touch-target justify-center active:scale-95 transition-transform bg-gray-50 rounded-lg py-2">
+                                        <span class="text-xl mb-1">${topic.theory ? '📖' : '📘'}</span>
+                                        <input type="checkbox" class="w-5 h-5 text-blue-600 rounded-md border-gray-300 focus:ring-0 shadow-sm" 
+                                            ${topic.theory ? 'checked' : ''} 
+                                            onchange="toggleState(${bIdx}, ${sIdx}, ${tIdx}, 'theory')">
+                                        <span class="text-[9px] font-bold text-gray-500 uppercase mt-1">Teoria</span>
+                                    </label>
+
+                                    <label class="flex flex-col items-center gap-1 flex-1 touch-target justify-center active:scale-95 transition-transform bg-gray-50 rounded-lg py-2">
+                                        <span class="text-xl mb-1">${topic.review ? '📝' : '📄'}</span>
+                                        <input type="checkbox" class="w-5 h-5 text-blue-600 rounded-md border-gray-300 focus:ring-0 shadow-sm" 
+                                            ${topic.review ? 'checked' : ''} 
+                                            onchange="toggleState(${bIdx}, ${sIdx}, ${tIdx}, 'review')">
+                                        <span class="text-[9px] font-bold text-gray-500 uppercase mt-1">Revisão</span>
+                                    </label>
+
+                                    <label class="flex flex-col items-center gap-1 flex-1 touch-target justify-center active:scale-95 transition-transform bg-gray-50 rounded-lg py-2">
+                                        <span class="text-xl mb-1">${topic.questions ? '🎯' : '⭕'}</span>
+                                        <input type="checkbox" class="w-5 h-5 text-blue-600 rounded-md border-gray-300 focus:ring-0 shadow-sm" 
+                                            ${topic.questions ? 'checked' : ''} 
+                                            onchange="toggleState(${bIdx}, ${sIdx}, ${tIdx}, 'questions')">
+                                        <span class="text-[9px] font-bold text-gray-500 uppercase mt-1">Questões</span>
+                                    </label>
+
+                                </div>
+                            </li>
+                        `;
+                    });
+
+                    blockHtml += `
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                blockHtml += `</div>`;
+                blockSection.innerHTML = blockHtml;
+                container.appendChild(blockSection);
+            });
+
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            let totalTasks = 0;
+            let totalCompleted = 0;
+
+            const dashBlocks = document.getElementById('dashboard-blocks');
+            dashBlocks.innerHTML = '';
+
+            appData.forEach((block, bIdx) => {
+                let blockTasks = 0;
+                let blockCompleted = 0;
+
+                block.subjects.forEach((subject, sIdx) => {
+                    let subTasks = subject.topics.length * 3; 
+                    let subCompleted = 0;
+
+                    subject.topics.forEach(topic => {
+                        if (topic.theory) subCompleted++;
+                        if (topic.review) subCompleted++;
+                        if (topic.questions) subCompleted++;
+                    });
+
+                    blockTasks += subTasks;
+                    blockCompleted += subCompleted;
+
+                    const statsSpan = document.getElementById(`stats-${bIdx}-${sIdx}`);
+                    if(statsSpan) {
+                        let pct = Math.round((subCompleted / subTasks) * 100) || 0;
+                        statsSpan.innerText = `${pct}%`;
+                    }
+                });
+
+                totalTasks += blockTasks;
+                totalCompleted += blockCompleted;
+
+                let blockPct = Math.round((blockCompleted / blockTasks) * 100) || 0;
+                
+                // Círculos de Progresso (Visualização muito comum em apps Android)
+                dashBlocks.innerHTML += `
+                    <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="relative w-14 h-14 flex-shrink-0">
+                            <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="16" fill="none" class="text-gray-100" stroke-width="3.5" stroke="currentColor"></circle>
+                                <circle cx="18" cy="18" r="16" fill="none" class="text-blue-600 progress-transition" stroke-width="3.5" stroke-dasharray="${blockPct}, 100" stroke-linecap="round" stroke="currentColor"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-[11px] font-extrabold text-gray-700">${blockPct}%</span>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-gray-800 text-sm mb-1">${block.title}</h4>
+                            <p class="text-xs text-gray-500">${blockCompleted} de ${blockTasks} tarefas feitas</p>
+                        </div>
+                    </div>
+                `;
+            });
+
+            let totalPct = Math.round((totalCompleted / totalTasks) * 100) || 0;
+            document.getElementById('total-percent').innerText = `${totalPct}%`;
+            document.getElementById('total-bar').style.width = `${totalPct}%`;
+        }
+
+        window.onload = initApp;
+
+    </script>
+</body>
+</html>
